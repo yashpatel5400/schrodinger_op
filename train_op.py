@@ -111,7 +111,6 @@ def train_models(phi_arr, psiT_arr, test_inputs, test_outputs, dictionary_data):
         fno_model.train()
         run_loss = 0
         for bx, by in train_loader:
-            print("s")
             bx, by = bx.to(device), by.to(device)
             optimizer.zero_grad()
             pred = fno_model(bx)
