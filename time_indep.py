@@ -2,6 +2,8 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
+import constants
+
 
 def build_2d_laplacian_periodic(N, dx):
     """
@@ -243,7 +245,7 @@ if __name__ == "__main__":
     L = 2.0*np.pi
     num_eigs = 5
     V_grid = np.zeros((N,N))  # free particle
-    E_vals, E_funcs = compute_eigenpairs(V_grid, N, L/N, num_eigs=num_eigs, hbar=1.0, m=1.0)
+    E_vals, E_funcs = compute_eigenpairs(V_grid, N, L/N, num_eigs=num_eigs, hbar=constants.hbar, m=constants.m)
 
     k_eigfunc_idx_pairs = [
         ([0, 0], [0, 1]),
