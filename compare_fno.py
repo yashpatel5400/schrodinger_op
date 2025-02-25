@@ -168,11 +168,17 @@ def main(potential):
     estimator = LinearEstimator(V_grid, N, dx, T, num_steps, K)
     
     # Train & compare
-    model = train_fno(
-        estimator.dictionary_phi, 
-        estimator.dictionary_psi,
-        N, K=K, num_epochs=50, batch_size=4
-    )
+    cached_model_fn = f"{potential}.pt"
+    if os.path.exists(cached_model_fn):
+        model = build_fno_model_2chan(N, K).to(device)
+        model.load_state_dict(torch.load(cached_model_fn))
+    else:
+        model = train_fno(
+            estimator.dictionary_phi, 
+            estimator.dictionary_psi,
+            N, K=K, num_epochs=20, batch_size=4
+        )
+        torch.save(model.state_dict(), cached_model_fn)
     compare_estimators(estimator, model, V_grid, N, dx, T, num_steps)
 
 if __name__ == "__main__":
