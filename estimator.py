@@ -15,7 +15,7 @@ from time_dep import split_step_solver_2d
 
 class LinearEstimator:
     def __init__(self, V_grid, N, dx, T, num_steps, K):
-        self.dictionary_psi = self.generate_dictionary_data_fft(V_grid, N, dx, T, num_steps, K)
+        self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_fft(V_grid, N, dx, T, num_steps, K)
 
     def generate_dictionary_data_fft(
         self, V_grid, N, dx, T, num_steps, K=None
@@ -38,6 +38,7 @@ class LinearEstimator:
                         (each is shape (N,N) complex), or None if out of range.
         """
         dictionary_psi = [[None]*N for _ in range(N)]  # 2D array of wavefunctions or None
+        dictionary_phi = [[None]*N for _ in range(N)]
         
         def freq_to_physical_index(k):
             """
@@ -68,9 +69,10 @@ class LinearEstimator:
                 psi_kT = split_step_solver_2d(V_grid, phi_k, N, dx, T, num_steps)
                 
                 # 4) store
+                dictionary_phi[kx][ky] = phi_k
                 dictionary_psi[kx][ky] = psi_kT
         
-        return dictionary_psi
+        return dictionary_phi, dictionary_psi
 
 
     def compute_estimate(self, u, K=None):
@@ -158,14 +160,13 @@ def main():
     V_grid = harmonic_oscillator_potential(N, L, omega, m=constants.m)
 
     estimator = LinearEstimator(V_grid, N, dx, T, num_steps, K)
-
+    
     # Suppose we have a new wavefunction:
     num_test_samples = 10
-    for _ in range(num_test_samples):
-        u_init = random_low_order_state(N, K=K)
-        u_est = estimator.compute_estimate(u_init)
-        u_true = split_step_solver_2d(V_grid, u_init, N, dx, T, num_steps)
-        
+    test_samples = [random_low_order_state(N, K=K) for _ in range(num_test_samples)]
+    for u_test in test_samples:
+        u_est = estimator.compute_estimate(u_test)
+        u_true = split_step_solver_2d(V_grid, u_test, N, dx, T, num_steps)
         err = np.linalg.norm(u_est - u_true)/(np.linalg.norm(u_true)+1e-14)
         print(f"Relative L2 error = {err:.2e}")
 
