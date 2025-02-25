@@ -124,7 +124,7 @@ def test_free_particle():
     dx = L/N
     num_steps = 50
 
-    V_grid = free_particle_potential()
+    V_grid = free_particle_potential(N)
 
     # build coordinate mesh
     Xgrid, Ygrid = np.meshgrid(np.arange(N), np.arange(N), indexing='ij')

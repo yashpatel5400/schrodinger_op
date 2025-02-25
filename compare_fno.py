@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 import numpy as np
@@ -11,8 +12,9 @@ from torch.utils.data import Dataset
 from neuralop.models import FNO2d
 import torch.nn as nn
 
+import constants
 from estimator import LinearEstimator, random_low_order_state
-from potentials import harmonic_oscillator_potential
+from potentials import free_particle_potential, harmonic_oscillator_potential, barrier_potential
 from time_dep import split_step_solver_2d
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -145,7 +147,7 @@ def compare_estimators(estimator, model,
     print(f"Mean(Linear)={lin_est_errors.mean():.4e},  Mean(FNO)={fno_errors.mean():.4e}")
 
 
-def main():
+def main(potential):
     N = 64
     L = 2*np.pi
     dx = L/N
@@ -154,7 +156,12 @@ def main():
     K = 16
     
     # Potential
-    V_grid = harmonic_oscillator_potential(N, L, omega=2.0, m=1.0)
+    V_grids = {
+        "free": free_particle_potential(N),
+        "harmonic_oscillator": harmonic_oscillator_potential(N, L, omega=2.0, m=constants.m),
+        "barrier": barrier_potential(N, L, barrier_height=50.0, slit_width=0.2),
+    }
+    V_grid = V_grids[potential]
     
     # Build the linear estimator
     print("Building estimator...")
@@ -169,4 +176,7 @@ def main():
     compare_estimators(estimator, model, V_grid, N, dx, T, num_steps)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--potential")
+    args = parser.parse_args()
+    main(args.potential)
