@@ -24,7 +24,7 @@ def test_estimator(estimator, test_samples):
         if isinstance(estimator, LinearEstimator):
             # Linear estimator solution
             psi_est = estimator.compute_estimate(psi0)
-        elif isinstance(estimator, FNO2d):
+        else:
             estimator.eval()
             
             # FNO solution: we must feed 2ch input => 2ch output
@@ -87,10 +87,10 @@ def main(potential, estimator_types):
         if estimator_type == "linear":
             estimator = LinearEstimator(V_grid, N, dx, T, num_steps, K)
         elif estimator_type == "fno":
-            estimator = train_fno(train_loader, N, K=K, num_epochs=50)
+            estimator = train_fno(train_loader, N, K=K, num_epochs=20)
             torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
         elif estimator_type == "onet":
-            estimator = train_onet(train_loader, N, num_epochs=50)
+            estimator = train_onet(train_loader, N, num_epochs=20)
             torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
 
         os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)

@@ -25,12 +25,10 @@ def build_fno_model_2chan(N, K):
 
 
 def train_fno(train_loader, N, K=16, num_epochs=50):
-    # 2) Build FNO with 2->2 channels
     model = build_fno_model_2chan(N, K).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
     
-    # 3) Training loop
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0

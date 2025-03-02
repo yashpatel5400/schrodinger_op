@@ -146,7 +146,6 @@ def train_onet(train_loader, N, num_epochs=20):
     train_samples: list of (psi0, psiT) pairs in complex NxN 
     N: domain resolution
     """
-    # Build model
     model = build_onet_model(N).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
