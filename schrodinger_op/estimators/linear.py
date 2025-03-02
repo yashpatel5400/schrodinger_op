@@ -11,7 +11,7 @@ from scipy.stats import ttest_rel
 import constants
 from potentials import free_particle_potential, barrier_potential, harmonic_oscillator_potential
 from dataset import random_low_order_state
-from solvers.time_dep import split_step_solver_2d
+from solvers.time_dep import solver
 
 
 class LinearEstimator:
@@ -19,7 +19,7 @@ class LinearEstimator:
         self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_fft(V_grid, N, dx, T, num_steps, K)
 
     def generate_dictionary_data_fft(
-        self, V_grid, N, dx, T, num_steps, K=None
+        self, V, N, dx, T, num_steps, K=None
     ):
         """
         Build a dictionary of time-evolved wavefunctions (psi_k^T) 
@@ -67,7 +67,7 @@ class LinearEstimator:
                 phi_k = np.fft.ifft2(freq_delta)  # shape (N,N)
                 
                 # 3) evolve with the split-step solver
-                psi_kT = split_step_solver_2d(V_grid, phi_k, N, dx, T, num_steps)
+                psi_kT = solver(V, phi_k, N, dx, T, num_steps)
                 
                 # 4) store
                 dictionary_phi[kx][ky] = phi_k

@@ -6,6 +6,7 @@ The following potentials are currently supported
 - Harmonic Oscillator (`harmonic_oscillator`)
 - Barrier (`barrier`)
 - Random (`random`)
+- Paul Trap (time-varying) (`paul_trap`)
 
 The following estimators are currently supported
 - New linear estimator (`linear`)
@@ -17,4 +18,9 @@ also do `all` for the estimator to run all the supported estimators. This will g
 respectively saving the trained estimators (other than the linear estimator) and the relative errors on the test dataset:
 ```
 python main.py --potential [potential] --estimator [estimator]
+```
+
+To then generate the final LaTex results table, run:
+```
+python eval.py
 ```

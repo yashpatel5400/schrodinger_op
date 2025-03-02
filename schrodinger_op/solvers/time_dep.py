@@ -107,6 +107,45 @@ def split_step_solver_2d(V_grid, psi0, N, dx, T, num_steps):
     return psi
 
 
+def split_step_solver_2d_time_varying(V_fn, psi0, N, dx, T, num_steps):
+    # used to solve if potential is time-varying (V_fn is now function that maps t -> field)
+    dt = T / num_steps
+    psi = psi0.astype(np.complex128).copy()
+
+    k_vec = 2.0 * np.pi * np.fft.fftfreq(N, d=dx)
+    kx, ky = np.meshgrid(k_vec, k_vec, indexing='ij')
+    k2 = kx**2 + ky**2
+    Kfac = np.exp(-1.0j * dt/(2.0*constants.m)*(constants.hbar*k2))
+
+    for n in range(num_steps):
+        t_n = n * dt
+        t_np1 = (n+1)*dt
+
+        V_n = V_fn(t_n)
+        V_np1 = V_fn(t_np1)
+
+        # half-step at t_n
+        V_half_n = np.exp(-0.5j * dt/constants.hbar * V_n)
+        psi *= V_half_n
+
+        # full-step kinetic
+        psi_k = np.fft.fft2(psi)
+        psi_k *= Kfac
+        psi = np.fft.ifft2(psi_k)
+
+        # half-step at t_{n+1}
+        V_half_np1 = np.exp(-0.5j * dt/constants.hbar * V_np1)
+        psi *= V_half_np1
+
+    return psi
+
+
+def solver(V, psi0, N, dx, T, num_steps):
+    if isinstance(V, np.ndarray):
+        return split_step_solver_2d(V, psi0, N, dx, T, num_steps)
+    return split_step_solver_2d_time_varying(V, psi0, N, dx, T, num_steps)
+
+
 def test_free_particle():
     """
     Compare the time evolution of split_step_solver_2d vs.
