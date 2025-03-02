@@ -9,7 +9,7 @@ from scipy.stats import ttest_rel
 
 import constants
 from potentials import free_particle_potential, barrier_potential, harmonic_oscillator_potential
-from time_indep import compute_eigenpairs 
+from solvers.time_indep import compute_eigenpairs 
 
 
 def time_indep_evolution(V_grid, psi0, N, dx, T, 

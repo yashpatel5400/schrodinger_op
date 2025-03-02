@@ -10,7 +10,7 @@ from scipy.stats import ttest_rel
 
 import constants
 from potentials import free_particle_potential, barrier_potential, harmonic_oscillator_potential
-from time_dep import split_step_solver_2d
+from solvers.time_dep import split_step_solver_2d
 
 
 class LinearEstimator:

@@ -9,10 +9,10 @@ from scipy.stats import ttest_rel
 
 import constants
 import potentials
-from fno import train_fno
-from deeponet import train_onet
-from linear import LinearEstimator, random_low_order_state
-from time_dep import split_step_solver_2d
+from estimators.fno import train_fno
+from estimators.deeponet import train_onet
+from estimators.linear import LinearEstimator, random_low_order_state
+import solvers
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -70,7 +70,7 @@ def main(potential, estimator_types):
     train_samples, test_samples = [], []
     for sample_idx in range(num_train + num_test):
         psi0 = random_low_order_state(N, K=K)
-        psiT = split_step_solver_2d(V_grid, psi0, N, dx, T, num_steps)
+        psiT = solvers.time_dep.split_step_solver_2d(V_grid, psi0, N, dx, T, num_steps)
         if sample_idx < num_train:
             train_samples.append((psi0, psiT))
         else:
