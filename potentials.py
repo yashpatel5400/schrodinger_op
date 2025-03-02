@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.fft import ifftn, fftn
 
 def free_particle_potential(N):
     return np.zeros((N, N))
@@ -41,3 +42,18 @@ def harmonic_oscillator_potential(N, L, omega=1.0, m=1.0):
     Yc = Y - L/2
     return 0.5*m*(omega**2)*(Xc**2 + Yc**2)
 
+
+def random_potential(N, alpha, beta, gamma):
+    # Random variables in KL expansion
+    xi = np.random.randn(N, N)
+    K1, K2 = np.meshgrid(np.arange(N), np.arange(N))
+
+    # Define the (square root of) eigenvalues of the covariance operator
+    coef = alpha**(1/2) *(4*np.pi**2 * (K1**2 + K2**2) + beta)**(-gamma / 2)
+        
+    # Construct the KL coefficients
+    L = N * coef * xi
+
+    #to make sure that the random field is mean 0
+    L[0, 0] = 0
+    return ifftn(L, norm='forward')
