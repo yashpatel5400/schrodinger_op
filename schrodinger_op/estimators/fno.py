@@ -7,8 +7,6 @@ from torch.utils.data import DataLoader
 from neuralop.models import FNO2d
 import torch.nn as nn
 
-from dataset import construct_dataset
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def build_fno_model_2chan(N, K):
@@ -26,10 +24,7 @@ def build_fno_model_2chan(N, K):
     return model
 
 
-def train_fno(train_samples, N, K=16, num_epochs=50, batch_size=4):
-    # 1) Build the complex dataset
-    train_loader = construct_dataset(train_samples, batch_size)
-    
+def train_fno(train_loader, N, K=16, num_epochs=50):
     # 2) Build FNO with 2->2 channels
     model = build_fno_model_2chan(N, K).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)

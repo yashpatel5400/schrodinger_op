@@ -9,9 +9,10 @@ from scipy.stats import ttest_rel
 
 import constants
 import potentials
+from dataset import random_low_order_state, construct_dataset
 from estimators.fno import train_fno
 from estimators.deeponet import train_onet
-from estimators.linear import LinearEstimator, random_low_order_state
+from estimators.linear import LinearEstimator
 import solvers
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,7 +35,7 @@ def test_estimator(estimator, test_samples):
             inp_torch = torch.from_numpy(psi0_2ch).unsqueeze(0).float().to(device)  # (1,2,N,N)
             
             pred_torch = estimator(inp_torch)  # (1,2,N,N)
-            psi_fno_2ch = pred_torch[0].cpu().numpy()  # shape (2,N,N)
+            psi_fno_2ch = pred_torch[0].detach().cpu().numpy()  # shape (2,N,N)
             # Reconstruct complex wavefunction
             psi_est = psi_fno_2ch[0] + 1j*psi_fno_2ch[1]
 
@@ -76,22 +77,21 @@ def main(potential, estimator_types):
         else:
             test_samples.append((psi0, psiT))
     train_samples, test_samples = np.array(train_samples), np.array(test_samples)
+    train_loader = construct_dataset(train_samples, batch_size=4)
 
     # ----- Compute errors for different estimators ----- #
     for estimator_type in estimator_types:
         print(f"Building {estimator_type} estimator...")
         
-        os.makedirs(constants.models_dir, exist_ok=True)
-            
-        os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)
+        os.makedirs(os.path.join(constants.models_dir, potential), exist_ok=True)
         if estimator_type == "linear":
             estimator = LinearEstimator(V_grid, N, dx, T, num_steps, K)
         elif estimator_type == "fno":
-            estimator = train_fno(train_samples, N, K=K, num_epochs=50, batch_size=4)
-            torch.save(estimator.state_dict(), os.path.join(constants.results_dir, potential, f"{estimator_type}.pt"))
+            estimator = train_fno(train_loader, N, K=K, num_epochs=50)
+            torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
         elif estimator_type == "onet":
-            estimator = train_onet(train_samples, N, num_epochs=50, batch_size=4)
-            torch.save(estimator.state_dict(), os.path.join(constants.results_dir, potential, f"{estimator_type}.pt"))
+            estimator = train_onet(train_loader, N, num_epochs=50)
+            torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
 
         os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)
         df = pd.DataFrame.from_dict({estimator_type : test_estimator(estimator, test_samples)})

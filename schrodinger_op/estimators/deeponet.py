@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from dataset import construct_dataset
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DeepONet2D(nn.Module):
@@ -143,13 +141,11 @@ def build_onet_model(N, branch_dim=64, hidden_branch=128, hidden_trunk=128):
     return model
 
 
-def train_onet(train_samples, N, num_epochs=20, batch_size=4):
+def train_onet(train_loader, N, num_epochs=20):
     """
     train_samples: list of (psi0, psiT) pairs in complex NxN 
     N: domain resolution
     """
-    train_loader = construct_dataset(train_samples, batch_size)
-    
     # Build model
     model = build_onet_model(N).to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
