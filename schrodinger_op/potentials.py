@@ -1,5 +1,13 @@
 import numpy as np
-from scipy.fft import ifftn, fftn
+from scipy.fft import ifftn
+
+
+def get_xy_mesh(N, L):
+    dx = L/N
+    xvals = np.arange(N)*dx
+    yvals = np.arange(N)*dx
+    return np.meshgrid(xvals, yvals, indexing='ij')
+
 
 def free_particle_potential(N):
     return np.zeros((N, N))
@@ -9,11 +17,7 @@ def barrier_potential(N, L, barrier_height=20.0, slit_width=0.4):
     """
     Place a vertical barrier at x=L/2 except for a small 'slit' in y.
     """
-    dx = L/N
-    xvals = np.arange(N)*dx
-    yvals = np.arange(N)*dx
-    X, Y = np.meshgrid(xvals, yvals, indexing='ij')
-    
+    X, Y = get_xy_mesh(N, L)
     Vgrid = np.zeros((N,N))
     # barrier region ~ x ~ L/2 => i0 = N//2
     i0 = N//2
@@ -35,9 +39,7 @@ def harmonic_oscillator_potential(N, L, omega=1.0, m=1.0):
     
     V(x,y) = 0.5*m*omega^2 * ((x - L/2)^2 + (y - L/2)^2).
     """
-    dx = L/N
-    xvals = np.arange(N)*dx
-    X, Y = np.meshgrid(xvals, xvals, indexing='ij')
+    X, Y = get_xy_mesh(N, L)
     Xc = X - L/2
     Yc = Y - L/2
     return 0.5*m*(omega**2)*(Xc**2 + Yc**2)
@@ -57,3 +59,9 @@ def random_potential(N, alpha, beta, gamma):
     #to make sure that the random field is mean 0
     L[0, 0] = 0
     return ifftn(L, norm='forward')
+
+
+def paul_trap(N, L, t, U0=1.0, V0=1.0, omega=1.0, r0=1.0):
+    X, Y = get_xy_mesh(N, L)
+    factor = (U0 + V0 * np.cos(omega*t)) / (r0**2)
+    return factor * (X**2 + Y**2)

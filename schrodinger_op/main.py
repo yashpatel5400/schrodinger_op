@@ -9,7 +9,7 @@ from scipy.stats import ttest_rel
 
 import constants
 import potentials
-from dataset import random_low_order_state, construct_dataset
+from dataset import random_low_order_state, construct_dataset, GRF
 from estimators.fno import train_fno
 from estimators.deeponet import train_onet
 from estimators.linear import LinearEstimator
@@ -70,7 +70,7 @@ def main(potential, estimator_types):
     np.random.seed(42)
     train_samples, test_samples = [], []
     for sample_idx in range(num_train + num_test):
-        psi0 = random_low_order_state(N, K=K)
+        psi0 = GRF(1, 1, 4, N) # random_low_order_state(N, K=K)
         psiT = solvers.time_dep.split_step_solver_2d(V_grid, psi0, N, dx, T, num_steps)
         if sample_idx < num_train:
             train_samples.append((psi0, psiT))
