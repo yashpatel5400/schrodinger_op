@@ -15,11 +15,11 @@ from solvers.time_dep import solver
 
 
 class LinearEstimator:
-    def __init__(self, V_grid, N, dx, T, num_steps, K):
-        self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_fft(V_grid, N, dx, T, num_steps, K)
+    def __init__(self, solver, N, K):
+        self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_fft(solver, N, K)
 
     def generate_dictionary_data_fft(
-        self, V, N, dx, T, num_steps, K=None
+        self, solver, N, K=None
     ):
         """
         Build a dictionary of time-evolved wavefunctions (psi_k^T) 
@@ -67,7 +67,7 @@ class LinearEstimator:
                 phi_k = np.fft.ifft2(freq_delta)  # shape (N,N)
                 
                 # 3) evolve with the split-step solver
-                psi_kT = solver(V, phi_k, N, dx, T, num_steps)
+                psi_kT = solver(phi_k)
                 
                 # 4) store
                 dictionary_phi[kx][ky] = phi_k

@@ -62,17 +62,23 @@ def main(potential, estimator_types):
         "barrier": potentials.barrier_potential(N, L, barrier_height=50.0, slit_width=0.2),
         "random": potentials.random_potential(N, alpha=1, beta=1, gamma=4),
         "paul_trap": lambda t : potentials.paul_trap(N, L, t, U0=10.0, V0=15.0, omega=3.0, r0=2.0),
+        "coulomb": potentials.electric_potential(N, L),
     }
     V = Vs[potential]
+
+    if potential == "coulomb":
+        solver = lambda psi0 : solvers.time_dep.solver(V, psi0, N, dx, T, num_steps)
+    else:
+        solver = lambda psi0 : solvers.time_dep.solver(V, psi0, N, dx, T, num_steps)
 
     num_train = (2 * K + 1) ** 2 # (2K+1)^2 to match lin est. sample count
     num_test  = 50
 
-    np.random.seed(42)
+    # np.random.seed(42)
     train_samples, test_samples = [], []
     for sample_idx in range(num_train + num_test):
         psi0 = GRF(1, 1, 4, N) # random_low_order_state(N, K=K)
-        psiT = solvers.time_dep.solver(V, psi0, N, dx, T, num_steps)
+        psiT = solver(psi0)
         if sample_idx < num_train:
             train_samples.append((psi0, psiT))
         else:
@@ -86,7 +92,7 @@ def main(potential, estimator_types):
         
         os.makedirs(os.path.join(constants.models_dir, potential), exist_ok=True)
         if estimator_type == "linear":
-            estimator = LinearEstimator(V, N, dx, T, num_steps, K)
+            estimator = LinearEstimator(solver, N, K)
         elif estimator_type == "fno":
             estimator = train_fno(train_loader, N, K=K, num_epochs=20)
             torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
