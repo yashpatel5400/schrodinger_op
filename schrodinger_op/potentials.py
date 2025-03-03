@@ -76,3 +76,28 @@ def electric_potential(N, L, k=1.0, e=1.0, eps=1e-12):
     r2 = X**2 + Y**2 + Z**2 + eps
     V = - (k * e**2) / r2
     return V
+
+
+def get_spherical_mesh(N_theta, N_phi):
+    theta_vals = np.linspace(0, np.pi, N_theta)
+    phi_vals   = np.linspace(0, 2 * np.pi, N_phi, endpoint=False)
+    return np.meshgrid(theta_vals, phi_vals, indexing='ij')
+
+
+def uniform_sphere(N_theta, N_phi, k=1.0, e=1.0):
+    """
+    Radially-symmetric Coulomb potential on the unit sphere => constant = -k e^2.
+    """
+    TH, PH = get_spherical_mesh(N_theta, N_phi)
+    V_grid = np.full((len(TH), len(PH)), fill_value=(-k*e**2), dtype=np.float64)
+    return V_grid
+
+
+def dipole_potential_sphere(N_theta, N_phi, V0=1.0):
+    """
+    Build a grid V(theta,phi) = V0 cos(theta)
+    on an (Ntheta x Nphi) mesh of angles.
+    """
+    TH, PH = get_spherical_mesh(N_theta, N_phi)
+    V_grid = V0 * np.cos(TH)  # shape (Ntheta, Nphi)
+    return V_grid
