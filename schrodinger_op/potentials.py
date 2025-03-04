@@ -66,18 +66,6 @@ def paul_trap(N, L, t, U0=1.0, V0=1.0, omega=1.0, r0=1.0):
     return factor * (X**2 + Y**2)
 
 
-def electric_potential(N, L, k=1.0, e=1.0, eps=1e-12):
-    """
-    Computes the radially symmetric electric potential:
-        V(r) = - (k e^2) / r^2,
-    on a 3D grid. Here r = sqrt(x^2 + y^2 + z^2).
-    """
-    X, Y, Z = get_mesh(N, L, d=3)
-    r2 = X**2 + Y**2 + Z**2 + eps
-    V = - (k * e**2) / r2
-    return V
-
-
 def get_spherical_mesh(N_theta, N_phi):
     theta_vals = np.linspace(0, np.pi, N_theta)
     phi_vals   = np.linspace(0, 2 * np.pi, N_phi, endpoint=False)
@@ -88,8 +76,7 @@ def uniform_sphere(N_theta, N_phi, k=1.0, e=1.0):
     """
     Radially-symmetric Coulomb potential on the unit sphere => constant = -k e^2.
     """
-    TH, PH = get_spherical_mesh(N_theta, N_phi)
-    V_grid = np.full((len(TH), len(PH)), fill_value=(-k*e**2), dtype=np.float64)
+    V_grid = np.full((N_theta, N_phi), fill_value=(-k*e**2), dtype=np.float64)
     return V_grid
 
 
