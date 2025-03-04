@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+import utils
+
 class DictionaryComplexDataset(Dataset):
     """
     A PyTorch Dataset that yields (phi_2chan, psi_2chan) from dictionary data,
@@ -87,3 +89,58 @@ def GRF(alpha, beta, gamma, N):
     L[0, 0] = 0
 
     return ifftn(L, norm='forward')
+
+
+
+def GRF_spherical(alpha, beta, gamma, Lmax, N_theta, N_phi):
+    """
+    Sample a Gaussian random field on the unit sphere by 
+    prescribing a power-law covariance in spherical harmonic space:
+    
+      c_{ell} ~ alpha^(1/2) * (ell(ell+1) + beta)^(-gamma/2).
+
+    1) Generate random normal xi_{ell,m} for ell=0..Lmax, m=-ell..ell.
+    2) Multiply xi_{ell,m} by c_{ell}.
+    3) Perform inverse spherical-harmonic transform to get field(θ,φ).
+
+    Parameters
+    ----------
+    alpha, beta, gamma : floats
+       parameters controlling the covariance power law.
+    Lmax : int
+       maximum spherical harmonic degree to keep
+    theta_vals : (Ntheta,) array in [0,π]
+    phi_vals   : (Nphi,)   array in [0,2π)
+    
+    Returns
+    -------
+    field_sphere : (Ntheta, Nphi) complex array
+        The resulting random field sampled on this (θ, φ) grid.
+    """
+    theta_vals = np.linspace(0, np.pi, N_theta)
+    phi_vals   = np.linspace(0, 2 * np.pi, N_phi, endpoint=False)
+
+    # 1) Create random normal draws xi_{ell,m}.
+    #    We'll store them in a 2D array flm of shape (Lmax+1, 2Lmax+1).
+    flm = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
+    
+    for ell in range(Lmax+1):
+        # 2) define the amplitude from the power-law
+        #    e.g. c_ell = α^(1/2)*[ell(ell+1) + β]^(-γ/2)
+        #    or use any other radial spectral formula you prefer.
+        c_ell = (alpha**0.5) * ((ell*(ell+1) + beta)**(-gamma/2))
+        
+        for m in range(-ell, ell+1):
+            # random normal re + im
+            re = np.random.randn()
+            im = np.random.randn()
+            # multiply by c_ell
+            flm[ell, m+ell] = c_ell*(re + 1j*im)
+    
+    # (Optional) enforce zero mean by setting flm[0,0]=0
+    # if you want a strictly zero-mean field for your problem. 
+    flm[0, 0] = 0+0j
+    
+    # 3) Inverse spherical-harmonic transform => real-space field(θ, φ).
+    field_sphere = utils.sph_inverse(flm, Lmax, theta_vals, phi_vals)
+    return field_sphere

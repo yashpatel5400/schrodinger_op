@@ -1,108 +1,29 @@
 import numpy as np
-from scipy.special import sph_harm
 
 import constants
+import potentials
+from dataset import GRF_spherical
 
-def sph_forward(psi, Lmax, theta_vals, phi_vals):
-    """
-    Naive forward spherical-harmonic transform:
-    psi -> f_{ell,m}, for ell=0..Lmax, m=-ell..ell.
-    
-    psi : (Ntheta, Nphi) complex array
-    Lmax : int
-    theta_vals : (Ntheta,) in [0, pi]
-    phi_vals   : (Nphi,)   in [0, 2pi)
-    
-    Returns
-    -------
-    flm : 2D complex array of shape (Lmax+1, 2*Lmax+1)
-          flm[ell, m+ell] = coefficient for (ell,m).
-    """
-    Ntheta = len(theta_vals)
-    Nphi = len(phi_vals)
-    dtheta = (theta_vals[-1] - theta_vals[0])/(Ntheta-1) if Ntheta>1 else 0.0
-    dphi = (phi_vals[-1] - phi_vals[0])/(Nphi) if Nphi>1 else 0.0
-    
-    # We'll store f_{ell,m} in flm[ell, m+ell].
-    flm = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
-    
-    # We'll do a double sum (i,j) over the grid.
-    for i, th in enumerate(theta_vals):
-        sin_th = np.sin(th)
-        for j, ph in enumerate(phi_vals):
-            val = psi[i,j]  # wavefunction at (th, ph)
-            for ell in range(Lmax+1):
-                for m_ in range(-ell, ell+1):
-                    # Evaluate Y_l^m(ph, th). 
-                    # Note sph_harm(m, ell, phi, theta).
-                    Y_lm = sph_harm(m_, ell, ph, th)
-                    # accumulate into flm
-                    # integral includes sin(th).
-                    flm[ell, m_+ell] += val * np.conjugate(Y_lm) * sin_th
-    # Multiply by the small area element
-    # dtheta * dphi is the "area" of each grid cell
-    # (We assume uniform spacing in phi, and in theta).
-    area_elem = dtheta*dphi
-    flm *= area_elem
-    return flm
+import utils
 
-
-def sph_inverse(flm, Lmax, theta_vals, phi_vals):
-    """
-    Naive inverse spherical-harmonic transform:
-    f_{ell,m} -> psi(theta,phi).
-    
-    flm : (Lmax+1, 2Lmax+1) complex array
-    Lmax : int
-    theta_vals, phi_vals as above
-    
-    Returns
-    -------
-    psi : (Ntheta, Nphi) complex array
-    """
-    Ntheta = len(theta_vals)
-    Nphi = len(phi_vals)
-    psi = np.zeros((Ntheta, Nphi), dtype=np.complex128)
-    for i, th in enumerate(theta_vals):
-        for j, ph in enumerate(phi_vals):
-            accum = 0.0+0.0j
-            for ell in range(Lmax+1):
-                for m_ in range(-ell, ell+1):
-                    Y_lm = sph_harm(m_, ell, ph, th)
-                    accum += flm[ell, m_+ell]*Y_lm
-            psi[i,j] = accum
-    return psi
-
-
-def split_step_solver_spherical(V_grid, psi0, Lmax, N_theta, N_phi, T, num_steps):
+def split_step_solver_spherical(V_grid, psi0, Lmax, T, num_steps):
     """
     Split-step solver for the time-dependent Schrodinger eqn on the unit sphere,
-    using naive spherical harmonic transforms from SciPy.
-
-    Parameters
-    ----------
-    psi0 : (Ntheta, Nphi) complex array, initial wavefunction
-    V_grid : (Ntheta, Nphi) real or complex array, time-INDEPENDENT potential
-    theta_vals, phi_vals : 1D arrays for the grid of angles
-    Lmax : int
-        max spherical harmonic degree
-    num_steps : int
-
-    Returns
-    -------
-    psi : (Ntheta, Nphi) complex array after time T=num_steps*dt
+    using vectorized spherical harmonic transforms.
     """
-    # Build a grid of angles
-    theta_vals   = np.linspace(0, np.pi, N_theta)
-    phi_vals     = np.linspace(0, 2*np.pi, N_phi, endpoint=False)
-    
+    # Build a grid of angles from shape of V_grid
+    Ntheta, Nphi = V_grid.shape
+    theta_vals = np.linspace(0, np.pi, Ntheta)
+    phi_vals   = np.linspace(0, 2*np.pi, Nphi, endpoint=False)
+
     dt = T / num_steps
     psi = psi0.copy()
+
     # half-step potential factor
-    half_phase = np.exp(-0.5j * dt/constants.hbar * V_grid)  # shape(Ntheta,Nphi)
+    half_phase = np.exp(-0.5j * dt/constants.hbar * V_grid)
 
     # precompute kinetic factors
-    # kinetic factor = exp(-i [constants.hbar/(2m)] * ell(ell+1) * dt )
+    # kinetic factor = exp(-i [hbar/(2m)] * ell(ell+1) * dt )
     kinetic_factors = np.zeros(Lmax+1, dtype=np.complex128)
     prefactor = (constants.hbar/(2.0*constants.m))*dt
     for ell in range(Lmax+1):
@@ -113,13 +34,55 @@ def split_step_solver_spherical(V_grid, psi0, Lmax, N_theta, N_phi, T, num_steps
         psi *= half_phase
 
         # full-step kinetic in spherical harmonic domain
-        flm = sph_forward(psi, Lmax, theta_vals, phi_vals)
+        flm = utils.sph_forward(psi, Lmax, theta_vals, phi_vals)
+
+        # multiply each row by the corresponding factor
         for ell in range(Lmax+1):
-            for m_ in range(-ell, ell+1):
-                flm[ell, m_+ell] *= kinetic_factors[ell]
-        psi = sph_inverse(flm, Lmax, theta_vals, phi_vals)
+            flm[ell,:] *= kinetic_factors[ell]
+
+        psi = utils.sph_inverse(flm, Lmax, theta_vals, phi_vals)
 
         # half-step potential
         psi *= half_phase
 
     return psi
+
+
+def test_spherical_grf():
+    """
+    Example usage of GRF_spherical to get a random wavefunction on a sphere,
+    then evolve it with split_step_solver_spherical.
+    """
+    import numpy as np
+    
+    # define a spherical grid
+    N_theta = 32
+    N_phi   = 64
+    
+    # define parameters for the GRF
+    alpha, beta, gamma = 1.0, 1.0, 4.0
+    Lmax = 20
+    psi0 = GRF_spherical(alpha, beta, gamma, Lmax, N_theta, N_phi)
+    
+    # (Optional) normalize
+    norm_psi0 = np.linalg.norm(psi0)
+    if norm_psi0>1e-14:
+        psi0 /= norm_psi0
+    
+    # Build a potential, e.g. a dipole or a constant Coulomb on the sphere
+    V_sphere = potentials.uniform_sphere(N_theta, N_phi, k=1.0, e=1.0)
+
+    # Evolve in time with your spherical solver
+    T = 0.1
+    num_steps = 50
+    psi_final = split_step_solver_spherical(
+        V_sphere,
+        psi0,
+        Lmax,
+        T,
+        num_steps
+    )
+
+
+if __name__ == "__main__":
+    test_spherical_grf()
