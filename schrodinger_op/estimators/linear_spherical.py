@@ -1,9 +1,7 @@
 import numpy as np
 
-import utils
-
 class LinearEstimatorSpherical:
-    def __init__(self, solver, N, K):
+    def __init__(self, solver, sph_transform, K, cached_dictionary_phi=None, cached_dictionary_psi=None):
         """
         solver: function(psi0) -> psi_T 
             a PDE solver that given an initial wavefunction psi0 on a sphere 
@@ -13,17 +11,22 @@ class LinearEstimatorSpherical:
 
         N: int
            number of discrete steps for theta or phi (depends on your approach).
-           We'll assume you have a spherical grid of shape (Ntheta, Nphi).
-           For simplicity here, we'll let N represent Ntheta. 
-           Then maybe Nphi=2N or something.
+           We'll assume you have a spherical grid of shape (N_theta, N_phi).
+           For simplicity here, we'll let N represent N_theta. 
+           Then maybe N_phi=2N or something.
 
         K: int
            maximum spherical harmonic degree (analogous to Lmax)
         """
         # build dictionary
-        self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_sph(solver, N, K)
+        self.sph_transform = sph_transform
+        if cached_dictionary_phi is None or cached_dictionary_psi is None:
+            self.dictionary_phi, self.dictionary_psi = self.generate_dictionary_data_sph(solver, K)
+        else:
+            self.dictionary_phi = cached_dictionary_phi
+            self.dictionary_psi = cached_dictionary_psi
 
-    def generate_dictionary_data_sph(self, solver, N, Lmax):
+    def generate_dictionary_data_sph(self, solver, K):
         """
         Build a dictionary of time-evolved wavefunctions in spherical harmonic space:
           for (ell,m) in 0..Lmax, -ell..ell:
@@ -34,28 +37,26 @@ class LinearEstimatorSpherical:
 
         Returns
         -------
-        dictionary_phi : 2D array [ell, m+ell], each is shape (Ntheta, Nphi) complex
-        dictionary_psi : 2D array [ell, m+ell], each is shape (Ntheta, Nphi) complex
+        dictionary_phi : 2D array [ell, m+ell], each is shape (N_theta, N_phi) complex
+        dictionary_psi : 2D array [ell, m+ell], each is shape (N_theta, N_phi) complex
         """
         # We'll assume you have consistent (theta_vals, phi_vals) for the solver 
         # or solver has them baked in. For a simpler approach, let's suppose 
         # the solver or a global config has them.
+        Lmax = self.sph_transform.Lmax
         dictionary_phi = [[None]*(2*Lmax+1) for _ in range(Lmax+1)]
         dictionary_psi = [[None]*(2*Lmax+1) for _ in range(Lmax+1)]
         
         # We'll define a shape for flm: (Lmax+1, 2Lmax+1)
         # Then "delta" in flm means flm[ell, m+ell] = 1
-        for ell in range(Lmax+1):
+        for ell in range(K+1):
             for m_ in range(-ell, ell+1):
+                print(f"Computing {(ell, m_)}")
                 # build a zero array
                 flm_delta = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
                 flm_delta[ell, m_+ell] = 1.0  # "delta" at that (ell,m)
                 
-                # inverse transform => phi_{ell,m}
-                # this yields shape (Ntheta, Nphi)
-                phi_lm = utils.sph_inverse(flm_delta, Lmax)  
-                
-                # evolve with PDE solver
+                phi_lm = self.sph_transform.inverse(flm_delta)  
                 psi_lmT = solver(phi_lm)  
 
                 dictionary_phi[ell][m_+ell] = phi_lm
@@ -76,11 +77,11 @@ class LinearEstimatorSpherical:
         """
         # forward transform => c_{ell,m}
         Lmax = len(self.dictionary_psi)-1  # we stored up to 'K' in the constructor
-        flm = utils.sph_forward(u, Lmax)
+        N_theta, N_phi = u.shape
+        flm = self.sph_transform.forward(u)
         
         # build the estimate
-        Ntheta, Nphi = u.shape
-        est = np.zeros((Ntheta, Nphi), dtype=np.complex128)
+        est = np.zeros((N_theta, N_phi), dtype=np.complex128)
 
         # if user passes a smaller K, we only sum up to that. 
         # or we sum up to Lmax if K=None or K > Lmax.

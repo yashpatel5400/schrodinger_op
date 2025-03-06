@@ -9,13 +9,14 @@ from scipy.stats import ttest_rel
 
 import constants
 import potentials
+import solvers.time_dep
+import solvers.spherical
 from dataset import construct_dataset, GRF, GRF_spherical
 from estimators.fno import train_fno
 from estimators.deeponet import train_onet
 from estimators.linear import LinearEstimator
 from estimators.linear_spherical import LinearEstimatorSpherical
-import solvers.time_dep
-import solvers.spherical
+from sph_transform import SphericalHarmonicsTransform
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -23,7 +24,7 @@ def test_estimator(estimator, test_samples):
     est_errors = []
     for psi0, psi_true in test_samples:
         # True PDE solution
-        if isinstance(estimator, LinearEstimator):
+        if isinstance(estimator, LinearEstimator) or isinstance(estimator, LinearEstimatorSpherical):
             # Linear estimator solution
             psi_est = estimator.compute_estimate(psi0)
         else:
@@ -50,26 +51,26 @@ def test_estimator(estimator, test_samples):
 
 
 def main(potential, estimator_types):
-    spherical_coords = potential in ["coulomb"] # only Coulomb potential uses spherical (for now)
+    spherical_coords = potential in ["coulomb", "dipole"] # only Coulomb and dipole potentials use spherical (for now)
     
     # --- Spherical coordinates constants --- #
-    N_theta = 32
+    Lmax    = 20   # modes used for projections to/from spherical coordinates (implicitly taken to be N/2 for FFT Euclidean case)
+    N_theta = 32   # spatial discretizations (theta/phi)
     N_phi   = 64
-    Lmax    = 20
-    K_sph   = 10
+    K_sph   = 10   # support of modes for linear estimator
+
+    sph_transform = SphericalHarmonicsTransform(Lmax, N_theta, N_phi)
 
     # --- Euclidean coordinates constants --- #
     N = 64          # spatial resolution
     L = 2 * np.pi   # spatial domain size
     dx = L/N        # spatial discretization
-    K_euc = 16      # support of modes for train/test data (over [-K, K]^d) -- used for both spherical and Euclidean
+    K_euc = 16      # support of modes for train/test data (over [-K, K]^d)
 
     # --- Temporal discretization constants --- #
     T = 0.1         # total time evolution
     num_steps = 50  # temporal resolution (for numerical PDE solver)
     
-    K = K_sph if spherical_coords else K_euc
-
     # ----- Generate potentials and train/test initial conditions ----- #
     Vs = {
         "free": potentials.free_particle_potential(N),
@@ -78,16 +79,17 @@ def main(potential, estimator_types):
         "random": potentials.random_potential(N, alpha=1, beta=1, gamma=4),
         "paul_trap": lambda t : potentials.paul_trap(N, L, t, U0=10.0, V0=15.0, omega=3.0, r0=2.0),
         "coulomb": potentials.uniform_sphere(N_theta, N_phi),
+        "dipole": potentials.dipole_potential_sphere(N_theta, N_phi),
     }
     V = Vs[potential]
 
     if spherical_coords:
-        solver = lambda psi0 : solvers.spherical.split_step_solver_spherical(V, psi0, Lmax, T, num_steps)
+        solver = lambda psi0 : solvers.spherical.split_step_solver_spherical(V, psi0, sph_transform, T, num_steps)
     else:
         solver = lambda psi0 : solvers.time_dep.solver(V, psi0, N, dx, T, num_steps)
         
     
-    num_train = (2 * K + 1) ** 2 # (2K+1)^2 to match lin est. sample count
+    num_train = (2 * K_euc + 1) ** 2 # (2K+1)^2 to match lin est. sample count
     num_test  = 50
 
     # np.random.seed(42)
@@ -101,7 +103,7 @@ def main(potential, estimator_types):
         for sample_idx in range(num_train + num_test):
             print(f"Computing sample: {sample_idx}...")
             if spherical_coords:
-                psi0 = GRF_spherical(1, 1, 4, Lmax, N_theta, N_phi)
+                psi0 = GRF_spherical(1, 1, 4, sph_transform)
             else:
                 psi0 = GRF(1, 1, 4, N)
 
@@ -124,8 +126,18 @@ def main(potential, estimator_types):
         
         os.makedirs(os.path.join(constants.models_dir, potential), exist_ok=True)
         if estimator_type == "linear":
+            cache_fn = os.path.join(constants.models_dir, potential, f"{estimator_type}.pkl")
             if spherical_coords:
-                estimator = LinearEstimatorSpherical(solver, N, K_sph)
+                if os.path.exists(cache_fn):
+                    print(f"Loading cached estimator from: {cache_fn}...")
+                    with open(cache_fn, "rb") as f:
+                        (cached_dictionary_phi, cached_dictionary_psi) = pickle.load(f)
+                    estimator = LinearEstimatorSpherical(solver, sph_transform, K_sph, cached_dictionary_phi, cached_dictionary_psi)
+
+                else:
+                    estimator = LinearEstimatorSpherical(solver, sph_transform, K_sph)
+                    with open(cache_fn, "wb") as f:
+                        pickle.dump((estimator.dictionary_phi, estimator.dictionary_psi), f)
             else:
                 estimator = LinearEstimator(solver, N, K_euc)
         elif estimator_type == "fno":

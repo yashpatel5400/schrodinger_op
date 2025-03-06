@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-import utils
-
 class DictionaryComplexDataset(Dataset):
     """
     A PyTorch Dataset that yields (phi_2chan, psi_2chan) from dictionary data,
@@ -92,7 +90,7 @@ def GRF(alpha, beta, gamma, N):
 
 
 
-def GRF_spherical(alpha, beta, gamma, Lmax, N_theta, N_phi):
+def GRF_spherical(alpha, beta, gamma, sph_transformer):
     """
     Sample a Gaussian random field on the unit sphere by 
     prescribing a power-law covariance in spherical harmonic space:
@@ -109,19 +107,17 @@ def GRF_spherical(alpha, beta, gamma, Lmax, N_theta, N_phi):
        parameters controlling the covariance power law.
     Lmax : int
        maximum spherical harmonic degree to keep
-    theta_vals : (Ntheta,) array in [0,π]
-    phi_vals   : (Nphi,)   array in [0,2π)
+    theta_vals : (N_theta,) array in [0,π]
+    phi_vals   : (N_phi,)   array in [0,2π)
     
     Returns
     -------
-    field_sphere : (Ntheta, Nphi) complex array
+    field_sphere : (N_theta, N_phi) complex array
         The resulting random field sampled on this (θ, φ) grid.
     """
-    theta_vals = np.linspace(0, np.pi, N_theta)
-    phi_vals   = np.linspace(0, 2 * np.pi, N_phi, endpoint=False)
-
     # 1) Create random normal draws xi_{ell,m}.
     #    We'll store them in a 2D array flm of shape (Lmax+1, 2Lmax+1).
+    Lmax = sph_transformer.Lmax
     flm = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
     
     for ell in range(Lmax+1):
@@ -142,5 +138,5 @@ def GRF_spherical(alpha, beta, gamma, Lmax, N_theta, N_phi):
     flm[0, 0] = 0+0j
     
     # 3) Inverse spherical-harmonic transform => real-space field(θ, φ).
-    field_sphere = utils.sph_inverse(flm, Lmax, theta_vals, phi_vals)
+    field_sphere = sph_transformer.inverse(flm)
     return field_sphere

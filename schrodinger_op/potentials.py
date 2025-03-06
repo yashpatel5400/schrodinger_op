@@ -83,8 +83,8 @@ def uniform_sphere(N_theta, N_phi, k=1.0, e=1.0):
 def dipole_potential_sphere(N_theta, N_phi, V0=1.0):
     """
     Build a grid V(theta,phi) = V0 cos(theta)
-    on an (Ntheta x Nphi) mesh of angles.
+    on an (N_theta x N_phi) mesh of angles.
     """
     TH, PH = get_spherical_mesh(N_theta, N_phi)
-    V_grid = V0 * np.cos(TH)  # shape (Ntheta, Nphi)
+    V_grid = V0 * np.cos(TH)  # shape (N_theta, N_phi)
     return V_grid

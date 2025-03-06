@@ -4,47 +4,34 @@ import constants
 import potentials
 from dataset import GRF_spherical
 
-import utils
-
-def split_step_solver_spherical(V_grid, psi0, Lmax, T, num_steps):
+def split_step_solver_spherical(V_grid, psi0, sph_transformer, T, num_steps):
     """
-    Split-step solver for the time-dependent Schrodinger eqn on the unit sphere,
-    using vectorized spherical harmonic transforms.
+    Split-step solver for time-dependent Schrodinger eqn on sphere,
+    using precomputed SphericalHarmonicsTransform 'sph_transformer'.
+    
+    psi0 : (Ntheta, Nphi) array
+    V_grid : (Ntheta, Nphi)
+    sph_transformer : SphericalHarmonicsTransform instance
+    T, num_steps : float, int
     """
-    # Build a grid of angles from shape of V_grid
-    Ntheta, Nphi = V_grid.shape
-    theta_vals = np.linspace(0, np.pi, Ntheta)
-    phi_vals   = np.linspace(0, 2*np.pi, Nphi, endpoint=False)
-
     dt = T / num_steps
     psi = psi0.copy()
-
-    # half-step potential factor
     half_phase = np.exp(-0.5j * dt/constants.hbar * V_grid)
 
     # precompute kinetic factors
-    # kinetic factor = exp(-i [hbar/(2m)] * ell(ell+1) * dt )
-    kinetic_factors = np.zeros(Lmax+1, dtype=np.complex128)
+    Lmax = sph_transformer.Lmax
+    Kfac = np.zeros(Lmax+1, dtype=np.complex128)
     prefactor = (constants.hbar/(2.0*constants.m))*dt
     for ell in range(Lmax+1):
-        kinetic_factors[ell] = np.exp(-1.0j * prefactor * ell*(ell+1))
+        Kfac[ell] = np.exp(-1.0j * prefactor * ell*(ell+1))
+    Kfac = np.expand_dims(Kfac, axis=-1)
 
-    for _step in range(num_steps):
-        # half-step potential
+    for step in range(num_steps):
         psi *= half_phase
-
-        # full-step kinetic in spherical harmonic domain
-        flm = utils.sph_forward(psi, Lmax, theta_vals, phi_vals)
-
-        # multiply each row by the corresponding factor
-        for ell in range(Lmax+1):
-            flm[ell,:] *= kinetic_factors[ell]
-
-        psi = utils.sph_inverse(flm, Lmax, theta_vals, phi_vals)
-
-        # half-step potential
+        flm = sph_transformer.forward(psi)
+        flm *= Kfac
+        psi = sph_transformer.inverse(flm)
         psi *= half_phase
-
     return psi
 
 
