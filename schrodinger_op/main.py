@@ -127,31 +127,34 @@ def main(potential, estimator_types):
     for estimator_type in estimator_types:
         print(f"Building {estimator_type} estimator...")
         
+        torch_cache_fn = os.path.join(constants.models_dir, potential, f"{estimator_type}.pt")
+        lin_cache_fn   = os.path.join(constants.models_dir, potential, f"{estimator_type}.pt")
+
         os.makedirs(os.path.join(constants.models_dir, potential), exist_ok=True)
         if estimator_type == "linear":
-            cache_fn = os.path.join(constants.models_dir, potential, f"{estimator_type}.pkl")
             if spherical_coords:
-                if os.path.exists(cache_fn):
-                    print(f"Loading cached estimator from: {cache_fn}...")
-                    with open(cache_fn, "rb") as f:
+                if os.path.exists(lin_cache_fn):
+                    print(f"Loading cached estimator from: {lin_cache_fn}...")
+                    with open(lin_cache_fn, "rb") as f:
                         (cached_dictionary_phi, cached_dictionary_psi) = pickle.load(f)
                     estimator = LinearEstimatorSpherical(solver, sph_transform, K_sph, cached_dictionary_phi, cached_dictionary_psi)
 
                 else:
                     estimator = LinearEstimatorSpherical(solver, sph_transform, K_sph)
-                    with open(cache_fn, "wb") as f:
+                    with open(lin_cache_fn, "wb") as f:
                         pickle.dump((estimator.dictionary_phi, estimator.dictionary_psi), f)
             else:
                 estimator = LinearEstimator(solver, N, K_euc)
         elif estimator_type == "fno":
             if spherical_coords:
                 estimator = train_sfno(train_loader, N_theta, N_phi, num_epochs=20)
+                torch.save(estimator.state_dict(), torch_cache_fn)
             else:
                 estimator = train_fno(train_loader, N, K=K_euc, num_epochs=20)
-                torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
+                torch.save(estimator.state_dict(), torch_cache_fn)
         elif estimator_type == "onet":
             estimator = train_onet(train_loader, N, num_epochs=20)
-            torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
+            torch.save(estimator.state_dict(), torch_cache_fn)
 
         os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)
         df = pd.DataFrame.from_dict({estimator_type : test_estimator(estimator, test_samples)})
