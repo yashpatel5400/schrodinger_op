@@ -12,10 +12,13 @@ import potentials
 import solvers.time_dep
 import solvers.spherical
 from dataset import construct_dataset, GRF, GRF_spherical
+
 from estimators.fno import train_fno
+from estimators.sfno import train_sfno
 from estimators.deeponet import train_onet
 from estimators.linear import LinearEstimator
 from estimators.linear_spherical import LinearEstimatorSpherical
+
 from sph_transform import SphericalHarmonicsTransform
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -141,8 +144,11 @@ def main(potential, estimator_types):
             else:
                 estimator = LinearEstimator(solver, N, K_euc)
         elif estimator_type == "fno":
-            estimator = train_fno(train_loader, N, K=K_euc, num_epochs=20)
-            torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
+            if spherical_coords:
+                estimator = train_sfno(train_loader, N_theta, N_phi, num_epochs=20)
+            else:
+                estimator = train_fno(train_loader, N, K=K_euc, num_epochs=20)
+                torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))
         elif estimator_type == "onet":
             estimator = train_onet(train_loader, N, num_epochs=20)
             torch.save(estimator.state_dict(), os.path.join(constants.models_dir, potential, f"{estimator_type}.pt"))

@@ -32,17 +32,17 @@ def train_fno(train_loader, N, K=16, num_epochs=50):
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        for (phi_in, psi_out) in train_loader:
-            phi_in = phi_in.to(device)   # shape (B,2,N,N)
+        for (psi_in, psi_out) in train_loader:
+            psi_in = psi_in.to(device)   # shape (B,2,N,N)
             psi_out = psi_out.to(device) # shape (B,2,N,N)
             
             optimizer.zero_grad()
-            pred = model(phi_in)   # -> (B,2,N,N)
+            pred = model(psi_in)   # -> (B,2,N,N)
             loss = loss_fn(pred, psi_out)
             loss.backward()
             optimizer.step()
             
-            running_loss += loss.item() * phi_in.size(0)
+            running_loss += loss.item() * psi_in.size(0)
         epoch_loss = running_loss / len(train_loader.dataset)
         print(f"Epoch {epoch+1}/{num_epochs}, Train MSE Loss = {epoch_loss:.4e}")
     return model
