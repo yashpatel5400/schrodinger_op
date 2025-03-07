@@ -43,7 +43,7 @@ class LinearEstimatorSpherical:
         # We'll assume you have consistent (theta_vals, phi_vals) for the solver 
         # or solver has them baked in. For a simpler approach, let's suppose 
         # the solver or a global config has them.
-        Lmax = self.sph_transform.Lmax
+        Lmax = self.sph_transform.lmax
         dictionary_phi = [[None]*(2*Lmax+1) for _ in range(Lmax+1)]
         dictionary_psi = [[None]*(2*Lmax+1) for _ in range(Lmax+1)]
         
@@ -51,12 +51,11 @@ class LinearEstimatorSpherical:
         # Then "delta" in flm means flm[ell, m+ell] = 1
         for ell in range(K+1):
             for m_ in range(-ell, ell+1):
-                print(f"Computing {(ell, m_)}")
                 # build a zero array
-                flm_delta = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
-                flm_delta[ell, m_+ell] = 1.0  # "delta" at that (ell,m)
+                flm_delta = self.sph_transform.spec_array_cplx()
+                flm_delta[self.sph_transform.zidx(ell, m_)] = 1.0  # "delta" at that (ell,m)
                 
-                phi_lm = self.sph_transform.inverse(flm_delta)  
+                phi_lm = self.sph_transform.synth_cplx(flm_delta)  
                 psi_lmT = solver(phi_lm)  
 
                 dictionary_phi[ell][m_+ell] = phi_lm
@@ -78,7 +77,7 @@ class LinearEstimatorSpherical:
         # forward transform => c_{ell,m}
         Lmax = len(self.dictionary_psi)-1  # we stored up to 'K' in the constructor
         N_theta, N_phi = u.shape
-        flm = self.sph_transform.forward(u)
+        flm = self.sph_transform.analys_cplx(u)
         
         # build the estimate
         est = np.zeros((N_theta, N_phi), dtype=np.complex128)
@@ -94,7 +93,7 @@ class LinearEstimatorSpherical:
                 psi_lmT = self.dictionary_psi[ell][m_+ell]
                 if psi_lmT is None:
                     continue
-                c_lm = flm[ell, m_+ell]
+                c_lm = flm[self.sph_transform.zidx(ell, m_)]
                 est += c_lm * psi_lmT
         
         return est

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from scipy.stats import ttest_rel
+import shtns
 
 import constants
 import potentials
@@ -18,8 +19,6 @@ from estimators.sfno import train_sfno
 from estimators.deeponet import train_onet
 from estimators.linear import LinearEstimator
 from estimators.linear_spherical import LinearEstimatorSpherical
-
-from sph_transform import SphericalHarmonicsTransform
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -62,7 +61,9 @@ def main(potential, estimator_types):
     N_phi   = 64
     K_sph   = 10   # support of modes for linear estimator
 
-    sph_transform = SphericalHarmonicsTransform(Lmax, N_theta, N_phi)
+    # sph_transform = SphericalHarmonicsTransform(Lmax, N_theta, N_phi)
+    sph_transform = shtns.sht(Lmax)
+    sph_transform.set_grid(N_theta, N_phi)
 
     # --- Euclidean coordinates constants --- #
     N = 64          # spatial resolution
@@ -92,7 +93,7 @@ def main(potential, estimator_types):
         solver = lambda psi0 : solvers.time_dep.solver(V, psi0, N, dx, T, num_steps)
         
     
-    num_train = (2 * K_euc + 1) ** 2 # (2K+1)^2 to match lin est. sample count
+    num_train = (Lmax + 1) ** 2 if spherical_coords else (2 * K_euc + 1) ** 2 # (2K+1)^2 to match lin est. sample count
     num_test  = 50
 
     # np.random.seed(42)
@@ -106,7 +107,7 @@ def main(potential, estimator_types):
         for sample_idx in range(num_train + num_test):
             print(f"Computing sample: {sample_idx}...")
             if spherical_coords:
-                psi0 = GRF_spherical(1, 1, 4, sph_transform)
+                psi0 = GRF_spherical(1, 1, 6, sph_transform)
             else:
                 psi0 = GRF(1, 1, 4, N)
 
@@ -128,7 +129,7 @@ def main(potential, estimator_types):
         print(f"Building {estimator_type} estimator...")
         
         torch_cache_fn = os.path.join(constants.models_dir, potential, f"{estimator_type}.pt")
-        lin_cache_fn   = os.path.join(constants.models_dir, potential, f"{estimator_type}.pt")
+        lin_cache_fn   = os.path.join(constants.models_dir, potential, f"{estimator_type}.pkl")
 
         os.makedirs(os.path.join(constants.models_dir, potential), exist_ok=True)
         if estimator_type == "linear":

@@ -117,9 +117,8 @@ def GRF_spherical(alpha, beta, gamma, sph_transformer):
     """
     # 1) Create random normal draws xi_{ell,m}.
     #    We'll store them in a 2D array flm of shape (Lmax+1, 2Lmax+1).
-    Lmax = sph_transformer.Lmax
-    flm = np.zeros((Lmax+1, 2*Lmax+1), dtype=np.complex128)
-    
+    Lmax = sph_transformer.lmax
+    flm = sph_transformer.spec_array_cplx()
     for ell in range(Lmax+1):
         # 2) define the amplitude from the power-law
         #    e.g. c_ell = α^(1/2)*[ell(ell+1) + β]^(-γ/2)
@@ -131,12 +130,12 @@ def GRF_spherical(alpha, beta, gamma, sph_transformer):
             re = np.random.randn()
             im = np.random.randn()
             # multiply by c_ell
-            flm[ell, m+ell] = c_ell*(re + 1j*im)
+            flm[sph_transformer.zidx(ell, m)] = c_ell*(re + 1j*im)
     
     # (Optional) enforce zero mean by setting flm[0,0]=0
     # if you want a strictly zero-mean field for your problem. 
-    flm[0, 0] = 0+0j
+    flm[0] = 0+0j
     
     # 3) Inverse spherical-harmonic transform => real-space field(θ, φ).
-    field_sphere = sph_transformer.inverse(flm)
+    field_sphere = sph_transformer.synth_cplx(flm)
     return field_sphere

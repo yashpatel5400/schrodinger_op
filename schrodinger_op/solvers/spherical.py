@@ -19,18 +19,17 @@ def split_step_solver_spherical(V_grid, psi0, sph_transformer, T, num_steps):
     half_phase = np.exp(-0.5j * dt/constants.hbar * V_grid)
 
     # precompute kinetic factors
-    Lmax = sph_transformer.Lmax
-    Kfac = np.zeros(Lmax+1, dtype=np.complex128)
+    Kfac = sph_transformer.spec_array_cplx()
     prefactor = (constants.hbar/(2.0*constants.m))*dt
-    for ell in range(Lmax+1):
-        Kfac[ell] = np.exp(-1.0j * prefactor * ell*(ell+1))
-    Kfac = np.expand_dims(Kfac, axis=-1)
-
+    for ell in range(sph_transformer.lmax+1):
+        for m in range(-ell, ell+1):
+            Kfac[sph_transformer.zidx(ell, m)] = np.exp(-1.0j * prefactor * ell*(ell+1))
+    
     for step in range(num_steps):
         psi *= half_phase
-        flm = sph_transformer.forward(psi)
+        flm = sph_transformer.analys_cplx(psi)
         flm *= Kfac
-        psi = sph_transformer.inverse(flm)
+        psi = sph_transformer.synth_cplx(flm)
         psi *= half_phase
     return psi
 
