@@ -1,4 +1,24 @@
-# Schrodinger Operator
+<h1 align='center'>Conformal Prediction for Ensembles: Improving Efficiency via Score-Based Aggregation</h1>
+
+<div align='center'>
+    <a href='https://yashpatel5400.github.io/' target='_blank'>Yash Patel</a><sup>1</sup>&emsp;;
+    <a href='https://unique-subedi.github.io/' target='_blank'>Unique Subedi</a><sup>1</sup>&emsp;
+    <a href='https://www.ambujtewari.com/' target='_blank'>Ambuj Tewari</a><sup>2</sup>&emsp;
+</div>
+
+<div align='center'>
+Department of Statistics, University of Michigan.
+</div>
+
+<p align='center'>
+    <sup>1</sup>Equal contributions&emsp;
+    <sup>2</sup>Senior investigator
+</p>
+<div align='center'>
+    <a href='https://arxiv.org/abs/2505.18288'><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a>
+</div>
+
+## ⚒️ Automatic Pipeline
 Linear operator learning for the time-dependent Schrodinger equation.
 
 The following potentials are currently supported
@@ -23,4 +43,20 @@ python main.py --potential [potential] --estimator [estimator]
 To then generate the final LaTex results table, run:
 ```
 python eval.py
+```
+
+## ⚖️ Disclaimer
+This project is intended for academic research, and we explicitly disclaim any responsibility for user-generated content. Users are solely liable for their actions while using the generative model. The project contributors have no legal affiliation with, nor accountability for, users' behaviors. It is imperative to use the generative model responsibly, adhering to both ethical and legal standards.
+
+## &#x1F4D2; Citation
+
+If you find our work useful for your research, please consider citing the paper :
+
+```
+@article{patel2025operator,
+  title={Operator Learning for Schr$\backslash$"$\{$o$\}$ dinger Equation: Unitarity, Error Bounds, and Time Generalization},
+  author={Patel, Yash and Subedi, Unique and Tewari, Ambuj},
+  journal={arXiv preprint arXiv:2505.18288},
+  year={2025}
+}
 ```
