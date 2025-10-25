@@ -1,4 +1,4 @@
-<h1 align='center'>Conformal Prediction for Ensembles: Improving Efficiency via Score-Based Aggregation</h1>
+<h1 align='center'>Operator Learning for Schrödinger Equation: Unitarity, Error Bounds, and Time Generalization</h1>
 
 <div align='center'>
     <a href='https://yashpatel5400.github.io/' target='_blank'>Yash Patel</a><sup>1</sup>&emsp;;
