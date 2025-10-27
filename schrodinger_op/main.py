@@ -9,7 +9,7 @@ import shtns
 import torch
 
 from scipy.stats import ttest_rel
-from itertools import repeat
+from itertools import product, repeat
 
 import constants
 import potentials
@@ -20,6 +20,8 @@ from dataset import construct_dataset, GRF, GRF_spherical
 from estimators.fno import train_fno
 from estimators.sfno import train_sfno
 from estimators.deeponet import train_onet
+from estimators.uno import train_uno
+
 from estimators.linear import LinearEstimator
 from estimators.linear_spherical import LinearEstimatorSpherical
 
@@ -38,6 +40,28 @@ def add_noise_dataset(samples: np.ndarray, noise_sigma: float) -> np.ndarray:
 
     noise = (np.random.randn(*x.shape) + 1j * np.random.randn(*x.shape)) * scales
     return x + noise
+
+def apply_partial_observation(samples: np.ndarray,
+                              zero_frac: float,
+                              seed: int = 0) -> np.ndarray:
+    if zero_frac <= 0.0:
+        return samples
+
+    x = samples.copy()
+    S, C, N, M = x.shape
+    assert C == 2, "Expected (S, 2, N, N) with channel 1 = ψT."
+
+    rng = np.random.default_rng(seed)
+
+    # Build independent masks for each sample: True=keep, False=zero
+    masks = rng.random((S, N, M)) > zero_frac  # (S,N,M)
+
+    psiT = x[:, 1]                             # (S,N,M)
+    W = np.fft.fft2(psiT, axes=(-2, -1))       # (S,N,M)
+    W *= masks
+    x[:, 1] = np.fft.ifft2(W, axes=(-2, -1))   # (S,N,M), complex
+
+    return x
 
 def test_estimator(estimator, test_samples):
     est_errors = []
@@ -68,7 +92,11 @@ def test_estimator(estimator, test_samples):
         est_errors.append(rel_err)
     return np.array(est_errors)
 
-def run_experiment(potential, estimator_types, noise_sigma: float = 0.0):
+def run_experiment(potential: str,
+                   estimator_types: list[str],
+                   noise_sigma: float,
+                   mode_zero_frac: float,
+                   mode_mask_seed: int):
     spherical_coords = potential in ["coulomb", "dipole"] # only Coulomb and dipole potentials use spherical (for now)
     
     # --- Spherical coordinates constants --- #
@@ -93,13 +121,13 @@ def run_experiment(potential, estimator_types, noise_sigma: float = 0.0):
     
     # ----- Generate potentials and train/test initial conditions ----- #
     Vs = {
-        "free": potentials.free_particle_potential(N),
-        "harmonic_oscillator": potentials.harmonic_oscillator_potential(N, L, omega=2.0, m=constants.m),
-        "barrier": potentials.barrier_potential(N, L, barrier_height=50.0, slit_width=0.2),
-        "random": potentials.random_potential(N, alpha=1, beta=1, gamma=4),
-        "paul_trap": lambda t : potentials.paul_trap(N, L, t, U0=10.0, V0=15.0, omega=3.0, r0=2.0),
-        "shaken_lattice": lambda t: potentials.shaken_lattice(N, L, t, V0=4.0, k=4*np.pi, A=0.08, omega=15.0),
-        "gaussian_pulse": lambda t: potentials.gaussian_pulse(N, L, t, V0=100.0, x0=0.0, y0=0.0, sigma_x=1.2, sigma_y=1.2, sigma_t=1.0, tcenters=(0.0,)),
+        "free": potentials.free_particle_potential(N), #-
+        "harmonic_oscillator": potentials.harmonic_oscillator_potential(N, L, omega=2.0, m=constants.m),#-
+        "barrier": potentials.barrier_potential(N, L, barrier_height=50.0, slit_width=0.2),#-
+        "random": potentials.random_potential(N, alpha=1, beta=1, gamma=4),#-
+        "paul_trap": lambda t : potentials.paul_trap(N, L, t, U0=10.0, V0=15.0, omega=3.0, r0=2.0),#-
+        "shaken_lattice": lambda t: potentials.shaken_lattice(N, L, t, V0=4.0, k=4*np.pi, A=0.08, omega=15.0),#-
+        "gaussian_pulse": lambda t: potentials.gaussian_pulse(N, L, t, V0=100.0, x0=0.0, y0=0.0, sigma_x=1.2, sigma_y=1.2, sigma_t=1.0, tcenters=(0.0,)),#-
         "coulomb": potentials.uniform_sphere(N_theta, N_phi),
         "dipole": potentials.dipole_potential_sphere(N_theta, N_phi),
     }
@@ -139,8 +167,13 @@ def run_experiment(potential, estimator_types, noise_sigma: float = 0.0):
         os.makedirs(os.path.join(constants.data_dir, potential), exist_ok=True)
         np.save(train_fn, train_samples)
         np.save(test_fn, test_samples)
+
+    # Add exogenous noise
     train_samples = add_noise_dataset(train_samples, noise_sigma)
     test_samples  = add_noise_dataset(test_samples, noise_sigma)
+
+    # Mask outputs *only* for training data
+    train_samples = apply_partial_observation(train_samples, mode_zero_frac, mode_mask_seed)
     train_loader = construct_dataset(train_samples, batch_size=4)
 
     # ----- Compute errors for different estimators ----- #
@@ -175,28 +208,36 @@ def run_experiment(potential, estimator_types, noise_sigma: float = 0.0):
         elif estimator_type == "onet":
             estimator = train_onet(train_loader, N, num_epochs=20)
             torch.save(estimator.state_dict(), torch_cache_fn)
+        elif estimator_type == "uno":
+            estimator = train_uno(train_loader, num_epochs=50, lr=1e-3, base=48, depth=4)
+            torch.save(estimator.state_dict(), torch_cache_fn)
 
         os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)
         df = pd.DataFrame.from_dict({estimator_type : test_estimator(estimator, test_samples)})
 
         noise_tag = f"noise{noise_sigma:.3g}"
-        out_csv = os.path.join(constants.results_dir, potential, f"{estimator_type}_{noise_tag}.csv")
+        mask_tag = "" if mode_zero_frac == 0.0 else f"mask{mode_zero_frac:.3g}"
+        out_csv = os.path.join(constants.results_dir, potential, f"{estimator_type}_{noise_tag}_{mask_tag}.csv")
         df.to_csv(out_csv, index=False)
         print(f"Saved results to: {out_csv}")
 
-def dispatch(potential: str, estimator_types: list[str], noise_sigmas: list[float], n_jobs: int):
-    # Sequential if only one job or one sigma
-    if n_jobs == 1 or len(noise_sigmas) == 1:
-        for sigma in noise_sigmas:
-            run_experiment(potential, estimator_types, sigma)
+def dispatch(potential: str,
+                  estimator_types: list[str],
+                  noise_sigmas: list[float],
+                  mode_zero_fracs: list[float],
+                  mode_mask_seed: int,
+                  n_jobs: int):
+    configs = list(product(noise_sigmas, mode_zero_fracs))
+    if n_jobs == 1 or len(configs) == 1:
+        for (ns, mf) in configs:
+            run_experiment(potential, estimator_types, ns, mf, mode_mask_seed)
         return
 
-    ctx = mp.get_context("spawn")
+    ctx = mp.get_context("spawn")  # safer with torch/shtns
     with ctx.Pool(processes=n_jobs) as pool:
-        # starmap passes tuples of args to run_experiment
         pool.starmap(
             run_experiment,
-            zip(repeat(potential), repeat(estimator_types), noise_sigmas)
+            [(potential, estimator_types, ns, mf, mode_mask_seed) for (ns, mf) in configs]
         )
 
 if __name__ == "__main__":
@@ -205,12 +246,18 @@ if __name__ == "__main__":
     parser.add_argument("--estimator", default="all", help="Estimator to fit/evaluate. One of: linear, fno, onet, or all")
     parser.add_argument("--noise_sigma", type=float, nargs="+", default=[0.0],
                         help="One or more noise levels, e.g. --noise_sigma 0 0.01 0.05")
+    parser.add_argument("--mode_zero_frac", type=float, nargs="+", default=[0.0],
+                    help="One or more mask fractions for partial observation of ψT during TRAINING only, e.g. --mode_zero_frac 0 0.2 0.5")
+    parser.add_argument(
+        "--mode_mask_seed", type=int, default=0,
+        help="RNG seed for building the mode mask (Linear estimator only)."
+    )
     parser.add_argument("--n_jobs", type=int, default=1,
                         help="Parallel processes across noise levels (use 1 for GPU models).")
     args = parser.parse_args()
 
     if args.estimator == "all":
-        estimator_types = ["linear", "fno", "onet"]
+        estimator_types = ["linear", "fno", "onet", "uno"]
     else:
         estimator_types = [args.estimator]
-    dispatch(args.potential, estimator_types, args.noise_sigma, args.n_jobs)
+    dispatch(args.potential, estimator_types, args.noise_sigma, args.mode_zero_frac, args.mode_mask_seed, args.n_jobs)
