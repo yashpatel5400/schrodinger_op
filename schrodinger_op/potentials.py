@@ -88,3 +88,21 @@ def dipole_potential_sphere(N_theta, N_phi, V0=1.0):
     TH, PH = get_spherical_mesh(N_theta, N_phi)
     V_grid = V0 * np.cos(TH)  # shape (N_theta, N_phi)
     return V_grid
+
+def shaken_lattice(N, L, t, V0=4.0, k=4*np.pi, A=0.08, omega=15.0):
+    X, Y = get_mesh(N, L)
+    phase = k * (X - A * np.sin(omega * t))
+    return V0 * np.cos(phase) + V0 * np.cos(k * Y)
+
+
+def gaussian_pulse(N, L, t, V0=100.0, x0=0.0, y0=0.0,
+                   sigma_x=1.2, sigma_y=1.2, sigma_t=1.0,
+                   tcenters=(0.0,)):
+    X, Y = get_mesh(N, L)
+    spatial = np.exp(-((X - x0)**2)/(2.0 * sigma_x**2)
+                     -((Y - y0)**2)/(2.0 * sigma_y**2))
+    # allow multiple pulses
+    if np.isscalar(tcenters):
+        tcenters = (tcenters,)
+    time_envelope = sum(np.exp(-((t - t0)**2)/(2.0 * sigma_t**2)) for t0 in tcenters)
+    return V0 * spatial * time_envelope

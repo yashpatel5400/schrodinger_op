@@ -27,6 +27,8 @@ The following potentials are currently supported
 - Barrier (`barrier`)
 - Random (`random`)
 - Paul Trap (time-varying) (`paul_trap`)
+- Coulomb (spherical) (`coulomb`)
+- Dipole (spherical) (`dipole`)
 
 The following estimators are currently supported
 - New linear estimator (`linear`)

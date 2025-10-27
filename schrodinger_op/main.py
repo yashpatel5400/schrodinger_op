@@ -1,12 +1,15 @@
 import argparse
 import os
 import pickle
+import multiprocessing as mp
 from neuralop.models import FNO2d
 import numpy as np
 import pandas as pd
-import torch
-from scipy.stats import ttest_rel
 import shtns
+import torch
+
+from scipy.stats import ttest_rel
+from itertools import repeat
 
 import constants
 import potentials
@@ -21,6 +24,20 @@ from estimators.linear import LinearEstimator
 from estimators.linear_spherical import LinearEstimatorSpherical
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def add_noise_dataset(samples: np.ndarray, noise_sigma: float) -> np.ndarray:
+    if noise_sigma <= 0:
+        return samples
+
+    x = samples.copy()
+    S, C, N, M = x.shape
+    assert C == 2
+
+    norms  = np.linalg.norm(x, axis=(2, 3), keepdims=True) / np.sqrt(N * M)
+    scales = noise_sigma * (norms + 1e-14)
+
+    noise = (np.random.randn(*x.shape) + 1j * np.random.randn(*x.shape)) * scales
+    return x + noise
 
 def test_estimator(estimator, test_samples):
     est_errors = []
@@ -51,8 +68,7 @@ def test_estimator(estimator, test_samples):
         est_errors.append(rel_err)
     return np.array(est_errors)
 
-
-def main(potential, estimator_types):
+def run_experiment(potential, estimator_types, noise_sigma: float = 0.0):
     spherical_coords = potential in ["coulomb", "dipole"] # only Coulomb and dipole potentials use spherical (for now)
     
     # --- Spherical coordinates constants --- #
@@ -82,6 +98,8 @@ def main(potential, estimator_types):
         "barrier": potentials.barrier_potential(N, L, barrier_height=50.0, slit_width=0.2),
         "random": potentials.random_potential(N, alpha=1, beta=1, gamma=4),
         "paul_trap": lambda t : potentials.paul_trap(N, L, t, U0=10.0, V0=15.0, omega=3.0, r0=2.0),
+        "shaken_lattice": lambda t: potentials.shaken_lattice(N, L, t, V0=4.0, k=4*np.pi, A=0.08, omega=15.0),
+        "gaussian_pulse": lambda t: potentials.gaussian_pulse(N, L, t, V0=100.0, x0=0.0, y0=0.0, sigma_x=1.2, sigma_y=1.2, sigma_t=1.0, tcenters=(0.0,)),
         "coulomb": potentials.uniform_sphere(N_theta, N_phi),
         "dipole": potentials.dipole_potential_sphere(N_theta, N_phi),
     }
@@ -121,7 +139,8 @@ def main(potential, estimator_types):
         os.makedirs(os.path.join(constants.data_dir, potential), exist_ok=True)
         np.save(train_fn, train_samples)
         np.save(test_fn, test_samples)
-    
+    train_samples = add_noise_dataset(train_samples, noise_sigma)
+    test_samples  = add_noise_dataset(test_samples, noise_sigma)
     train_loader = construct_dataset(train_samples, batch_size=4)
 
     # ----- Compute errors for different estimators ----- #
@@ -159,16 +178,39 @@ def main(potential, estimator_types):
 
         os.makedirs(os.path.join(constants.results_dir, potential), exist_ok=True)
         df = pd.DataFrame.from_dict({estimator_type : test_estimator(estimator, test_samples)})
-        df.to_csv(os.path.join(constants.results_dir, potential, f"{estimator_type}.csv"))
+
+        noise_tag = f"noise{noise_sigma:.3g}"
+        out_csv = os.path.join(constants.results_dir, potential, f"{estimator_type}_{noise_tag}.csv")
+        df.to_csv(out_csv, index=False)
+        print(f"Saved results to: {out_csv}")
+
+def dispatch(potential: str, estimator_types: list[str], noise_sigmas: list[float], n_jobs: int):
+    # Sequential if only one job or one sigma
+    if n_jobs == 1 or len(noise_sigmas) == 1:
+        for sigma in noise_sigmas:
+            run_experiment(potential, estimator_types, sigma)
+        return
+
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(processes=n_jobs) as pool:
+        # starmap passes tuples of args to run_experiment
+        pool.starmap(
+            run_experiment,
+            zip(repeat(potential), repeat(estimator_types), noise_sigmas)
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--potential")
     parser.add_argument("--estimator", default="all", help="Estimator to fit/evaluate. One of: linear, fno, onet, or all")
+    parser.add_argument("--noise_sigma", type=float, nargs="+", default=[0.0],
+                        help="One or more noise levels, e.g. --noise_sigma 0 0.01 0.05")
+    parser.add_argument("--n_jobs", type=int, default=1,
+                        help="Parallel processes across noise levels (use 1 for GPU models).")
     args = parser.parse_args()
 
     if args.estimator == "all":
         estimator_types = ["linear", "fno", "onet"]
     else:
         estimator_types = [args.estimator]
-    main(args.potential, estimator_types)
+    dispatch(args.potential, estimator_types, args.noise_sigma, args.n_jobs)
