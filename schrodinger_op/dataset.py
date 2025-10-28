@@ -70,7 +70,7 @@ def random_low_order_state(N, K=16):
     
     return psi0
 
-def GRF(alpha, beta, gamma, N):
+def GRF(alpha, beta, gamma, N, K_keep=None):
     # Random variables in KL expansion
     xi = np.random.randn(N, N)
 
@@ -86,11 +86,20 @@ def GRF(alpha, beta, gamma, N):
     #to make sure that the random field is mean 0
     L[0, 0] = 0
 
+    if K_keep is not None:
+        # wrapped/effective indices in [-N/2 .. N/2]
+        kx_eff = K1.copy()
+        ky_eff = K2.copy()
+        kx_eff[kx_eff > N//2] -= N
+        ky_eff[ky_eff > N//2] -= N
+        band_mask = (np.abs(kx_eff) <= K_keep) & (np.abs(ky_eff) <= K_keep)
+        L = L * band_mask
+
     return ifftn(L, norm='forward')
 
 
 
-def GRF_spherical(alpha, beta, gamma, sph_transformer):
+def GRF_spherical(alpha, beta, gamma, sph_transformer, Lmax_keep=None):
     """
     Sample a Gaussian random field on the unit sphere by 
     prescribing a power-law covariance in spherical harmonic space:
@@ -119,23 +128,23 @@ def GRF_spherical(alpha, beta, gamma, sph_transformer):
     #    We'll store them in a 2D array flm of shape (Lmax+1, 2Lmax+1).
     Lmax = sph_transformer.lmax
     flm = sph_transformer.spec_array_cplx()
+
     for ell in range(Lmax+1):
-        # 2) define the amplitude from the power-law
-        #    e.g. c_ell = α^(1/2)*[ell(ell+1) + β]^(-γ/2)
-        #    or use any other radial spectral formula you prefer.
+        # >>> NEW: skip coefficients beyond the estimator's spherical cap
+        if (Lmax_keep is not None) and (ell > Lmax_keep):
+            # ensure all (ell, m) are zeroed
+            for m in range(-ell, ell+1):
+                flm[sph_transformer.zidx(ell, m)] = 0.0 + 0.0j
+            continue
+
         c_ell = (alpha**0.5) * ((ell*(ell+1) + beta)**(-gamma/2))
-        
         for m in range(-ell, ell+1):
-            # random normal re + im
             re = np.random.randn()
             im = np.random.randn()
-            # multiply by c_ell
-            flm[sph_transformer.zidx(ell, m)] = c_ell*(re + 1j*im)
-    
-    # (Optional) enforce zero mean by setting flm[0,0]=0
-    # if you want a strictly zero-mean field for your problem. 
-    flm[0] = 0+0j
-    
-    # 3) Inverse spherical-harmonic transform => real-space field(θ, φ).
+            flm[sph_transformer.zidx(ell, m)] = c_ell * (re + 1j*im)
+
+    # optional: enforce zero mean
+    flm[0] = 0.0 + 0.0j
+
     field_sphere = sph_transformer.synth_cplx(flm)
     return field_sphere

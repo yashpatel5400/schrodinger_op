@@ -24,7 +24,7 @@ def _file_for_estimator(results_dir: str, estimator_key: str, sigma: float, mask
     core = core_map[estimator_key]
     noise_tag = f"noise{sigma:.3g}"
     mask_tag  = f"mask{mask:.3g}"
-    fn = f"{core}_{noise_tag}_.csv"
+    fn = f"{core}_{noise_tag}_{mask_tag}.csv"
     path = os.path.join(results_dir, fn)
     if not os.path.exists(path):
         raise FileNotFoundError(f"Missing file for {estimator_key}: {fn}")
