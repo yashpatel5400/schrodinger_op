@@ -140,7 +140,7 @@ def run_experiment(potential: str,
         
     
     num_train = (Lmax + 1) ** 2 if spherical_coords else (2 * K_euc + 1) ** 2 # (2K+1)^2 to match lin est. sample count
-    num_test  = 50
+    num_test  = 100
 
     # np.random.seed(42)
     train_fn = os.path.join(constants.data_dir, potential, "train.npy")

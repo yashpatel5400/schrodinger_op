@@ -23,7 +23,7 @@ def _file_for_estimator(results_dir: str, estimator_key: str, sigma: float, mask
     core_map = {"FNO": "fno", "UNO": "uno", "DeepONet": "onet", "Linear": "linear"}
     core = core_map[estimator_key]
     noise_tag = f"noise{sigma:.3g}"
-    mask_tag  = f"mask{mask:.3g}"
+    mask_tag  = "" if mask == 0.0 else f"mask{mask:.3g}"
     fn = f"{core}_{noise_tag}_{mask_tag}.csv"
     path = os.path.join(results_dir, fn)
     if not os.path.exists(path):
@@ -125,17 +125,17 @@ def main():
         print(latex_vals)
 
         # Tests table
-        out_tests = os.path.join(constants.results_dir, f"{args.outfile_prefix}_tests_{noise_tag}_{mask_tag}.tex")
-        latex_tests = df_tests.to_latex(
-            column_format="c" * (1 + len(df_tests.columns)),
-            na_rep="---",
-            index=True,
-            escape=False
-        )
-        with open(out_tests, "w") as f:
-            f.write(latex_tests)
-        print(f"[{noise_tag} {mask_tag}] wrote TESTS  -> {out_tests}")
-        print(latex_tests)
+        # out_tests = os.path.join(constants.results_dir, f"{args.outfile_prefix}_tests_{noise_tag}_{mask_tag}.tex")
+        # latex_tests = df_tests.to_latex(
+        #     column_format="c" * (1 + len(df_tests.columns)),
+        #     na_rep="---",
+        #     index=True,
+        #     escape=False
+        # )
+        # with open(out_tests, "w") as f:
+        #     f.write(latex_tests)
+        # print(f"[{noise_tag} {mask_tag}] wrote TESTS  -> {out_tests}")
+        # print(latex_tests)
 
 
 if __name__ == "__main__":

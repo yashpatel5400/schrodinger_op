@@ -27,6 +27,8 @@ The following potentials are currently supported
 - Barrier (`barrier`)
 - Random (`random`)
 - Paul Trap (time-varying) (`paul_trap`)
+- Shaken Lattice (`shaken_lattice`)
+- Gaussian Pulse (`gaussian_pulse`)
 - Coulomb (spherical) (`coulomb`)
 - Dipole (spherical) (`dipole`)
 
@@ -39,7 +41,7 @@ To run the pipeline on a given potential with a given estimator, run the followi
 also do `all` for the estimator to run all the supported estimators. This will generate results in the `models/` and `results` directories,
 respectively saving the trained estimators (other than the linear estimator) and the relative errors on the test dataset:
 ```
-python main.py --potential [potential] --estimator [estimator]
+python main.py --potential free --estimator all --noise_sigma 1e-4 1e-3 1e-2 --n_jobs 4
 ```
 
 To then generate the final LaTex results table, run:
