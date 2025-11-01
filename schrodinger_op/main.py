@@ -155,7 +155,7 @@ def run_experiment(potential: str,
             if spherical_coords:
                 psi0 = GRF_spherical(1, 1, 6, sph_transform)
             else:
-                psi0 = GRF(1, 1, 4, N)
+                psi0 = GRF(1, 1, 4, N, K_keep=K_euc)
 
             psiT = solver(psi0)
             if sample_idx < num_train:

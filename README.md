@@ -39,14 +39,26 @@ The following estimators are currently supported
 
 To run the pipeline on a given potential with a given estimator, run the following command (from the supported list above). You can
 also do `all` for the estimator to run all the supported estimators. This will generate results in the `models/` and `results` directories,
-respectively saving the trained estimators (other than the linear estimator) and the relative errors on the test dataset:
+respectively saving the trained estimators (other than the linear estimator) and the relative errors on the test dataset.
+
+### Full Observation
+To run the main estimator pipeline (without partial observation), run for example:
 ```
 python main.py --potential free --estimator all --noise_sigma 1e-4 1e-3 1e-2 --n_jobs 4
 ```
-
 To then generate the final LaTex results table, run:
 ```
-python eval.py
+python eval.py --noise_sigma 1e-3
+```
+
+### Partial Observation
+To run with partial observation, run
+```
+python main.py --potential free --estimator all --noise_sigma 1e-3 --mode_zero_frac 0.1 0.2 --n_jobs 4
+```
+Similarly, to generate the results table, run 
+```
+python eval.py --noise_sigma 1e-3 --mode_zero_frac 0.1
 ```
 
 ## ⚖️ Disclaimer
